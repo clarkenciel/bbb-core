@@ -1,0 +1,21 @@
+[root]
+name = "byte-beat"
+version = "0.1.0"
+dependencies = [
+ "hound 3.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "sample 0.7.1 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "hound"
+version = "3.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
+name = "sample"
+version = "0.7.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[metadata]
+"checksum hound 3.2.0 (registry+https://github.com/rust-lang/crates.io-index)" = "8781eeae4692901cfcd2ea111de1d723ce368afb7f59b7e7e5c2ebd609782bb9"
+"checksum sample 0.7.1 (registry+https://github.com/rust-lang/crates.io-index)" = "52d2eeaa79da09734ea18b06f9a5e695f9ca2eb5bb5d3ab64ee8e777141bf3dc"

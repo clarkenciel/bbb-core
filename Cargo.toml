@@ -1,0 +1,8 @@
+[package]
+name = "byte-beat"
+version = "0.1.0"
+authors = ["Danny Clarke <danny.clarke@gimbal.com>"]
+
+[dependencies]
+sample = "0.7.1"
+hound = "3.2.0"
