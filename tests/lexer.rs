@@ -47,7 +47,7 @@ fn test_state_next_at_end() {
 
 #[test]
 fn test_char_lexer_match() {
-    let lexer = CharLexer::new('a');
+    let lexer = character('a');
     let mut state = LexerState::from("a");
     let result = lexer.run(&mut state);
     assert_eq!(
@@ -63,7 +63,7 @@ fn test_char_lexer_match() {
 
 #[test]
 fn test_char_lexer_failure() {
-    let lexer = CharLexer::new('a');
+    let lexer = character('a');
     let state = LexerState::from("b");
     let result = lexer.run(&state);
     assert_eq!(
@@ -243,17 +243,39 @@ fn test_many_match_many_complex() {
 fn test_between_match() {
     let abc = string("abc");
     let (open_paren, closed_paren) = (character('('), character (')'));
-    let lexer = between(open_parent, closed_parent, abc);
+    let lexer = between(&open_paren, &closed_paren, &abc);
     let state = LexerState::from("(abc)");
-    let result = lexer.run(state);
+    let result = lexer.run(&state);
 
     assert_eq!(
         result,
         Ok(LexerState {
             element: Some(')'),
             position: Some(4),
-            value: Some("abc"),
+            value: Some("abc".to_owned()),
             stream: Rc::new(vec!['(', 'a', 'b', 'c', ')']),
+        })
+    );
+}
+
+#[test]
+fn test_between_complex_match() {
+    let abc = string("abc");
+    let bac = string("bac");
+    let abc_or_bac = or(&abc, &bac);
+    let abc_or_bacs = many(&abc_or_bac);
+    let (open_paren, closed_paren) = (character('('), character (')'));
+    let lexer = between(&open_paren, &closed_paren, &abc_or_bacs);
+    let state = LexerState::from("(abcbacbacabc)");
+    let result = lexer.run(&state);
+
+    assert_eq!(
+        result,
+        Ok(LexerState {
+            element: Some(')'),
+            position: Some(13),
+            value: Some(vec!["abc".to_owned(), "bac".to_owned(), "bac".to_owned(), "abc".to_owned()]),
+            stream: Rc::new(vec!['(', 'a', 'b', 'c', 'b', 'a', 'c', 'b', 'a', 'c', 'a', 'b', 'c', ')']),
         })
     );
 }

@@ -8,10 +8,10 @@ pub struct LexerState<T>
 where
     T: Clone,
 {
-    value: Option<T>,
-    position: Option<usize>,
-    element: Option<char>,
-    stream: Rc<SymbolStream>,
+    pub value: Option<T>,
+    pub position: Option<usize>,
+    pub element: Option<char>,
+    pub stream: Rc<SymbolStream>,
 }
 
 impl<T> LexerState<T>
@@ -32,6 +32,15 @@ where
 
     fn is_done(&self) -> bool {
         Some(self.stream.len()) <= self.position
+    }
+
+    fn drop_value<T2: Clone>(&self) -> LexerState<T2> {
+        LexerState {
+            element: self.element,
+            position: self.position,
+            stream: self.stream.clone(),
+            value: None,
+        }
     }
 }
 
@@ -82,8 +91,8 @@ impl<'a, T: Clone + 'a> From<&'a LexerState<T>> for LexerState<T> {
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct LexerError {
-    position: Option<usize>,
-    string: String,
+    pub position: Option<usize>,
+    pub string: String,
 }
 
 impl<'a, T> From<LexerState<T>> for LexerError
@@ -395,8 +404,23 @@ pub fn between<'a, I: 'a + Clone, O: 'a + Clone>(
 
 impl<'a, I: 'a + Clone, O: 'a + Clone> Lexer<'a, I, O> for BetweenLexer<'a, I, O> {
     fn run(&self, state: &LexerState<I>) -> LexerResult<'a, O> {
-        self.open_lexer.run(state)
-            .and_then(|state| self.body_lexer.run(&state))
-            .and_then(|state| self.close_lexer.run(&state).and_then(|_| Ok(state)))
+        self.open_lexer
+            .run(state)
+            .and_then(|body_start| {
+                self.body_lexer
+                    .run(&body_start.drop_value())
+                    .and_then(move |body_end| {
+                        self.close_lexer
+                            .run(&body_end.drop_value())
+                            .map(move |final_state|
+                                LexerState {
+                                    element: final_state.element,
+                                    position: final_state.position,
+                                    stream: final_state.stream,
+                                    value: body_end.value,
+                                }
+                            )
+                    })
+            })
     }
 }
