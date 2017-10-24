@@ -1,3 +1,4 @@
+use std::marker::PhantomData;
 use std::rc::Rc;
 
 type SymbolStream = Vec<char>;
@@ -30,10 +31,6 @@ where
         }
     }
 
-    fn is_done(&self) -> bool {
-        Some(self.stream.len()) <= self.position
-    }
-
     fn drop_value<T2: Clone>(&self) -> LexerState<T2> {
         LexerState {
             element: self.element,
@@ -54,18 +51,6 @@ impl LexerState<String> {
                 val
             })
             .or(Some(character.to_string()));
-        output
-    }
-
-    fn add_string(&self, string: &str) -> Self {
-        let mut output = self.clone();
-        output.value = output
-            .value
-            .map(|mut val| {
-                val.push_str(string);
-                val
-            })
-            .or(Some(string.to_owned()));
         output
     }
 }
@@ -121,71 +106,65 @@ where
 
 // lexer result ///////////////////////////////////////////////////////////////
 
-pub type LexerResult<'a, O> = Result<LexerState<O>, LexerError>;
+pub type LexerResult<O> = Result<LexerState<O>, LexerError>;
 
 // lexer trait ////////////////////////////////////////////////////////////////
 
-pub trait Lexer<'a, I, O>
-where
-    I: Clone + 'a,
-    O: Clone + 'a,
-{
-    fn run(&self, state: &LexerState<I>) -> LexerResult<'a, O>;
+pub trait Lexer<I: Clone, O: Clone> {
+    fn run(&self, state: &LexerState<I>) -> LexerResult<O>;
 }
-
-type BasicLexer<'a, T> = &'a Lexer<'a, T, T>;
-type TransformLexer<'a, I, O> = &'a Lexer<'a, I, O>;
 
 // or /////////////////////////////////////////////////////////////////////////
 
-pub struct OrLexer<'a, I: 'a, O: 'a> {
-    option_a: &'a Lexer<'a, I, O>,
-    option_b: &'a Lexer<'a, I, O>,
+pub struct OrLexer<I: Clone, O: Clone, A: Lexer<I, O>, B: Lexer<I, O>> {
+    option_a: A,
+    option_b: B,
+    phantom_input: PhantomData<I>,
+    phantom_output: PhantomData<O>,
 }
 
-impl<'a, I, O> OrLexer<'a, I, O> {
-    fn new(option_a: &'a Lexer<'a, I, O>, option_b: &'a Lexer<'a, I, O>) -> Self {
+impl<I: Clone, O: Clone, A: Lexer<I, O>, B: Lexer<I, O>> OrLexer<I, O, A, B> {
+    fn new(option_a: A, option_b: B) -> Self {
         OrLexer {
             option_a: option_a,
             option_b: option_b,
+            phantom_input: PhantomData,
+            phantom_output: PhantomData,
         }
     }
 }
 
-impl<'a, I, O> Lexer<'a, I, O> for OrLexer<'a, I, O>
-where
-    I: Clone,
-    O: Clone,
-{
-    fn run(&self, state: &LexerState<I>) -> LexerResult<'a, O> {
+impl<I: Clone, O: Clone, A: Lexer<I, O>, B: Lexer<I, O>> Lexer<I, O> for OrLexer<I, O, A, B> {
+    fn run(&self, state: &LexerState<I>) -> LexerResult<O> {
         self.option_a.run(state).or_else(
             |_| self.option_b.run(state),
         )
     }
 }
 
-pub fn or<'a, I, O>(a: &'a Lexer<'a, I, O>, b: &'a Lexer<'a, I, O>) -> OrLexer<'a, I, O> {
+pub fn or<I: Clone, O: Clone, A: Lexer<I, O>, B: Lexer<I, O>>(a: A, b: B) -> OrLexer<I, O, A, B> {
     OrLexer::new(a, b)
 }
 
 
 // try ////////////////////////////////////////////////////////////////////////
 
-pub struct TryLexer<'a, I: 'a> {
-    lexer: &'a Lexer<'a, I, I>,
+pub struct TryLexer<I: Clone, L: Lexer<I, I>> {
+    lexer: L,
+    phantom_input: PhantomData<I>,
 }
 
-impl<'a, I> TryLexer<'a, I> {
-    fn new(lexer: &'a Lexer<'a, I, I>) -> Self {
-        TryLexer { lexer: lexer }
+impl<I: Clone, L: Lexer<I, I>> TryLexer<I, L> {
+    fn new(lexer: L) -> Self {
+        TryLexer {
+            lexer: lexer,
+            phantom_input: PhantomData,
+        }
     }
 }
 
-impl<'a, I> Lexer<'a, I, I> for TryLexer<'a, I>
-where
-    I: Clone,
-{
-    fn run(&self, state: &LexerState<I>) -> LexerResult<'a, I> {
+impl<I: Clone, L: Lexer<I, I>> Lexer<I, I> for TryLexer<I, L> {
+    fn run(&self, state: &LexerState<I>) -> LexerResult<I> {
         match self.lexer.run(state) {
             Err(_) => Ok(state.clone()),
             result => result,
@@ -193,41 +172,36 @@ where
     }
 }
 
-pub fn try<'a, I>(lexer: &'a Lexer<'a, I, I>) -> TryLexer<'a, I> {
+pub fn try<I: Clone, L: Lexer<I, I>>(lexer: L) -> TryLexer<I, L> {
     TryLexer::new(lexer)
 }
 
 // map ////////////////////////////////////////////////////////////////////////
 
-pub struct MapLexer<'a, I: 'a, O: 'a> {
-    function: &'a Fn(I) -> O,
-    lexer: &'a Lexer<'a, I, I>,
+pub struct MapLexer<I: Clone, O: Clone, F: Fn(I) -> O, L: Lexer<I, I>> {
+    function: F,
+    lexer: L,
+    phantom_input: PhantomData<I>,
+    phantom_output: PhantomData<O>,
 }
 
-impl<'a, I, O> MapLexer<'a, I, O>
-where
-    I: Clone + 'a,
-    O: Clone + 'a,
-{
-    fn new(lexer: &'a Lexer<'a, I, I>, f: &'a Fn(I) -> O) -> MapLexer<'a, I, O> {
+impl<I: Clone, O: Clone, F: Fn(I) -> O, L: Lexer<I, I>> MapLexer<I, O, F, L> {
+    fn new(lexer: L, f: F) -> MapLexer<I, O, F, L> {
         MapLexer {
             function: f,
             lexer: lexer,
+            phantom_input: PhantomData,
+            phantom_output: PhantomData,
         }
     }
 }
 
-impl<'a, I, O> Lexer<'a, I, O> for MapLexer<'a, I, O>
-where
-    I: Clone + 'a,
-    O: Clone + 'a,
-{
-    fn run(&self, state: &LexerState<I>) -> LexerResult<'a, O> {
-        let transform = self.function;
+impl<I: Clone, O: Clone, F: Fn(I) -> O, L: Lexer<I, I>> Lexer<I, O> for MapLexer<I, O, F, L> {
+    fn run(&self, state: &LexerState<I>) -> LexerResult<O> {
         self.lexer.run(state).map(|ref new_state| {
             LexerState {
                 element: new_state.element,
-                value: new_state.clone().value.map(transform),
+                value: new_state.clone().value.map(&self.function),
                 position: new_state.position,
                 stream: new_state.stream.clone(),
             }
@@ -235,36 +209,40 @@ where
     }
 }
 
-pub fn map<'a, I, O>(lexer: &'a Lexer<'a, I, I>, f: &'a Fn(I) -> O) -> MapLexer<'a, I, O>
+pub fn map<I, O, F, L>(lexer: L, f: F) -> MapLexer<I, O, F, L>
 where
-    I: Clone + 'a,
-    O: Clone + 'a,
+    I: Clone,
+    O: Clone,
+    F: Fn(I) -> O,
+    L: Lexer<I, I>,
 {
     MapLexer::new(lexer, f)
 }
 
 // many ///////////////////////////////////////////////////////////////////////
 
-pub struct ManyLexer<'a, I: 'a> {
-    lexer: &'a Lexer<'a, I, I>,
+pub struct ManyLexer<I: Clone, L: Lexer<I, I>> {
+    lexer: L,
+    phantom_input: PhantomData<I>,
 }
 
-impl<'a, I: 'a> ManyLexer<'a, I> {
-    fn new(lexer: &'a Lexer<'a, I, I>) -> Self {
-        ManyLexer { lexer: lexer }
+impl<I: Clone, L: Lexer<I, I>> ManyLexer<I, L> {
+    fn new(lexer: L) -> Self {
+        ManyLexer {
+            lexer: lexer,
+            phantom_input: PhantomData,
+        }
     }
 }
 
-impl<'a, I: 'a> From<&'a Lexer<'a, I, I>> for ManyLexer<'a, I> {
-    fn from(lexer: &'a Lexer<'a, I, I>) -> Self {
+impl<I: Clone, L: Lexer<I, I>> From<L> for ManyLexer<I, L> {
+    fn from(lexer: L) -> Self {
         ManyLexer::new(lexer)
     }
 }
 
-use std::fmt::Debug;
-impl<'a, I: 'a + Clone + Debug> Lexer<'a, I, Vec<I>> for ManyLexer<'a, I> {
-    fn run(&self, state: &LexerState<I>) -> LexerResult<'a, Vec<I>> {
-        let lexer = try(self.lexer);
+impl<I: Clone, L: Lexer<I, I>> Lexer<I, Vec<I>> for ManyLexer<I, L> {
+    fn run(&self, state: &LexerState<I>) -> LexerResult<Vec<I>> {
         let mut next_state = state.clone();
         let mut output = LexerState {
             element: state.element,
@@ -274,24 +252,20 @@ impl<'a, I: 'a + Clone + Debug> Lexer<'a, I, Vec<I>> for ManyLexer<'a, I> {
         };
 
         loop {
-            match lexer.run(&next_state) {
+            match self.lexer.run(&next_state) {
+                Err(_) => break,
                 Ok(mut new_state) => {
-                    if new_state.position > output.position {
-                        if let Some(value) = new_state.value {
-                            output.value = output.value.map(|mut vec| {
-                                vec.push(value.clone());
-                                vec
-                            });
-                        }
-                        output.element = new_state.element;
-                        output.position = new_state.position;
-                        new_state.value = None;
-                        next_state = new_state;
-                    } else {
-                        break;
+                    if let Some(value) = new_state.value {
+                        output.value = output.value.map(|mut vec| {
+                            vec.push(value.clone());
+                            vec
+                        });
                     }
+                    output.element = new_state.element;
+                    output.position = new_state.position;
+                    new_state.value = None;
+                    next_state = new_state;
                 }
-                _ => break,
             }
         }
 
@@ -299,7 +273,7 @@ impl<'a, I: 'a + Clone + Debug> Lexer<'a, I, Vec<I>> for ManyLexer<'a, I> {
     }
 }
 
-pub fn many<'a, I>(lexer: &'a Lexer<'a, I, I>) -> ManyLexer<'a, I> {
+pub fn many<I: Clone, L: Lexer<I, I>>(lexer: L) -> ManyLexer<I, L> {
     ManyLexer::new(lexer)
 }
 
@@ -315,8 +289,8 @@ impl CharLexer {
     }
 }
 
-impl<'a> Lexer<'a, String, String> for CharLexer {
-    fn run(&self, state: &LexerState<String>) -> LexerResult<'a, String> {
+impl Lexer<String, String> for CharLexer {
+    fn run(&self, state: &LexerState<String>) -> LexerResult<String> {
         let next_state = state.next();
         next_state
             .element
@@ -329,7 +303,7 @@ impl<'a> Lexer<'a, String, String> for CharLexer {
     }
 }
 
-pub fn character<'a>(character: char) -> CharLexer {
+pub fn character(character: char) -> CharLexer {
     CharLexer::new(character)
 }
 
@@ -357,8 +331,8 @@ impl From<String> for StringLexer {
     }
 }
 
-impl<'a> Lexer<'a, String, String> for StringLexer {
-    fn run(&self, state: &LexerState<String>) -> LexerResult<'a, String> {
+impl Lexer<String, String> for StringLexer {
+    fn run(&self, state: &LexerState<String>) -> LexerResult<String> {
         self.char_lexers.iter().fold(
             Ok(state.clone()),
             |running, lexer| {
@@ -374,36 +348,66 @@ pub fn string<'a>(string: &'a str) -> StringLexer {
 
 // between ////////////////////////////////////////////////////////////////////
 
-pub struct BetweenLexer<'a, I: 'a + Clone, O: 'a + Clone> {
-    open_lexer: BasicLexer<'a, I>,
-    close_lexer: BasicLexer<'a, I>,
-    body_lexer: TransformLexer<'a, I, O>,
+
+pub struct BetweenLexer<I, O, Open, Close, Body>
+where
+    I: Clone,
+    O: Clone,
+    Open: Lexer<I, I>,
+    Close: Lexer<I, I>,
+    Body: Lexer<I, O>,
+{
+    open_lexer: Open,
+    close_lexer: Close,
+    body_lexer: Body,
+    phantom_input: PhantomData<I>,
+    phantom_output: PhantomData<O>,
 }
 
-impl<'a, I: 'a + Clone, O: 'a + Clone> BetweenLexer<'a, I, O> {
-    fn new(
-        open: BasicLexer<'a, I>,
-        close: BasicLexer<'a, I>,
-        body: TransformLexer<'a, I, O>,
-    ) -> BetweenLexer<'a, I, O> {
+impl<I, O, Open, Close, Body> BetweenLexer<I, O, Open, Close, Body>
+where
+    I: Clone,
+    O: Clone,
+    Open: Lexer<I, I>,
+    Close: Lexer<I, I>,
+    Body: Lexer<I, O>,
+{
+    fn new(open: Open, close: Close, body: Body) -> BetweenLexer<I, O, Open, Close, Body> {
         BetweenLexer {
             open_lexer: open,
             close_lexer: close,
             body_lexer: body,
+            phantom_input: PhantomData,
+            phantom_output: PhantomData,
         }
     }
 }
 
-pub fn between<'a, I: 'a + Clone, O: 'a + Clone>(
-    open: BasicLexer<'a, I>,
-    close: BasicLexer<'a, I>,
-    body: TransformLexer<'a, I, O>,
-) -> BetweenLexer<'a, I, O> {
+
+pub fn between<I, O, Open, Close, Body>(
+    open: Open,
+    close: Close,
+    body: Body,
+) -> BetweenLexer<I, O, Open, Close, Body>
+where
+    I: Clone,
+    O: Clone,
+    Open: Lexer<I, I>,
+    Close: Lexer<I, I>,
+    Body: Lexer<I, O>,
+{
     BetweenLexer::new(open, close, body)
 }
 
-impl<'a, I: 'a + Clone, O: 'a + Clone> Lexer<'a, I, O> for BetweenLexer<'a, I, O> {
-    fn run(&self, state: &LexerState<I>) -> LexerResult<'a, O> {
+impl<I, O, Open, Close, Body> Lexer<I, O> for BetweenLexer<I, O, Open, Close, Body>
+where
+    I: Clone,
+    O: Clone,
+    Open: Lexer<I, I>,
+    Close: Lexer<I, I>,
+    Body: Lexer<I, O>,
+{
+    fn run(&self, state: &LexerState<I>) -> LexerResult<O> {
         self.open_lexer
             .run(state)
             .and_then(|body_start| {

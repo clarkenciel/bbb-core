@@ -48,8 +48,8 @@ fn test_state_next_at_end() {
 #[test]
 fn test_char_lexer_match() {
     let lexer = character('a');
-    let mut state = LexerState::from("a");
-    let result = lexer.run(&mut state);
+    let state = LexerState::from("a");
+    let result = lexer.run(&state);
     assert_eq!(
         result,
         Ok(LexerState {
@@ -106,30 +106,37 @@ fn test_string_lexer_failure() {
 }
 
 #[test]
-fn test_or_lexer_match() {
+fn test_or_lexer_match_first() {
     let abc = string("abc");
     let cba = string("cba");
-    let lexer = or(&abc, &cba);
+    let lexer = or(abc, cba);
+    let state = LexerState::from("abc");
+    let result = lexer.run(&state);
 
-    let mut state = LexerState::from("abc");
-    let result = lexer.run(&mut state);
     assert_eq!(
         result,
         Ok(LexerState {
             element: Some('c'),
-            position: Some(3),
+            position: Some(2),
             value: Some("abc".to_owned()),
             stream: Rc::new(vec!['a', 'b', 'c']),
         })
     );
+}
 
-    let mut state = LexerState::from("cba");
-    let result = lexer.run(&mut state);
+#[test]
+fn test_or_lexer_match_other() {
+    let abc = string("abc");
+    let cba = string("cba");
+    let lexer = or(abc, cba);
+    let state = LexerState::from("cba");
+    let result = lexer.run(&state);
+
     assert_eq!(
         result,
         Ok(LexerState {
             element: Some('a'),
-            position: Some(3),
+            position: Some(2),
             value: Some("cba".to_owned()),
             stream: Rc::new(vec!['c', 'b', 'a']),
         })
@@ -137,17 +144,37 @@ fn test_or_lexer_match() {
 }
 
 #[test]
+fn test_or_lexer_match_compound() {
+    let abc = string("abc");
+    let cba = string("cba");
+    let abc_or_cba = or(abc, cba);
+    let abc_or_cba_or_dog = or(abc_or_cba, string("dog"));
+    let state = LexerState::from("dog");
+    let result = abc_or_cba_or_dog.run(&state);
+
+    assert_eq!(
+        result,
+        Ok(LexerState {
+            element: Some('g'),
+            position: Some(2),
+            value: Some("dog".to_owned()),
+            stream: Rc::new(vec!['d', 'o', 'g'])
+        })
+    )
+}
+
+#[test]
 fn test_map_match() {
     let abc = string("abc");
-    let lexer = map(&abc, &|_| 100);
-    let mut state = LexerState::from("abc");
-    let result = lexer.run(&mut state);
+    let lexer = map(abc, |_| 100);
+    let state = LexerState::from("abc");
+    let result = lexer.run(&state);
 
     assert_eq!(
         result,
         Ok(LexerState {
             element: Some('c'),
-            position: Some(3),
+            position: Some(2),
             value: Some(100),
             stream: Rc::new(vec!['a', 'b', 'c']),
         })
@@ -157,7 +184,7 @@ fn test_map_match() {
 #[test]
 fn test_try_match() {
     let abc = string("abc");
-    let lexer = try(&abc);
+    let lexer = try(abc);
     let state = LexerState::from("abc");
     let result = lexer.run(&state);
 
@@ -174,8 +201,7 @@ fn test_try_match() {
 
 #[test]
 fn test_try_fail() {
-    let abc = string("abc");
-    let lexer = try(&abc);
+    let lexer = try(string("abc"));
     let state = LexerState::from("babc");
     let result = lexer.run(&state);
 
@@ -184,16 +210,15 @@ fn test_try_fail() {
 
 #[test]
 fn test_many_match_single() {
-    let abc = string("abc");
-    let lexer = many(&abc);
-    let mut state = LexerState::from("abc");
-    let result = lexer.run(&mut state);
+    let lexer = many(string("abc"));
+    let state = LexerState::from("abc");
+    let result = lexer.run(&state);
 
     assert_eq!(
         result,
         Ok(LexerState {
             element: Some('c'),
-            position: Some(3),
+            position: Some(2),
             value: Some(vec!["abc".to_owned()]),
             stream: Rc::new(vec!['a', 'b', 'c']),
         })
@@ -202,10 +227,9 @@ fn test_many_match_single() {
 
 #[test]
 fn test_many_match_many() {
-    let abc = string("abc");
-    let lexer = many(&abc);
-    let mut state = LexerState::from("abcabc");
-    let result = lexer.run(&mut state);
+    let lexer = many(string("abc"));
+    let state = LexerState::from("abcabc");
+    let result = lexer.run(&state);
 
     assert_eq!(
         result,
@@ -221,12 +245,9 @@ fn test_many_match_many() {
 
 #[test]
 fn test_many_match_many_complex() {
-    let abc = string("abc");
-    let bac = string("bac");
-    let abc_or_bac = or(&abc, &bac);
-    let lexer = many(&abc_or_bac);
-    let mut state = LexerState::from("abcbac");
-    let result = lexer.run(&mut state);
+    let lexer = many(or(string("abc"), string("bac")));
+    let state = LexerState::from("abcbac");
+    let result = lexer.run(&state);
 
     assert_eq!(
         result,
@@ -241,9 +262,7 @@ fn test_many_match_many_complex() {
 
 #[test]
 fn test_between_match() {
-    let abc = string("abc");
-    let (open_paren, closed_paren) = (character('('), character (')'));
-    let lexer = between(&open_paren, &closed_paren, &abc);
+    let lexer = between(character('('), character(')'), string("abc"));
     let state = LexerState::from("(abc)");
     let result = lexer.run(&state);
 
@@ -260,12 +279,10 @@ fn test_between_match() {
 
 #[test]
 fn test_between_complex_match() {
-    let abc = string("abc");
-    let bac = string("bac");
-    let abc_or_bac = or(&abc, &bac);
-    let abc_or_bacs = many(&abc_or_bac);
-    let (open_paren, closed_paren) = (character('('), character (')'));
-    let lexer = between(&open_paren, &closed_paren, &abc_or_bacs);
+    let lexer = between(
+        character('('), character(')'),
+        many(or(string("abc"), string("bac")))
+    );
     let state = LexerState::from("(abcbacbacabc)");
     let result = lexer.run(&state);
 
