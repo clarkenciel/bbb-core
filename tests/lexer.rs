@@ -166,7 +166,7 @@ fn test_or_lexer_match_compound() {
 #[test]
 fn test_map_match() {
     let abc = string("abc");
-    let lexer = map(abc, |_| 100);
+    let lexer = map(abc, |string| string.chars().collect::<Vec<char>>().len());
     let state = LexerState::from("abc");
     let result = lexer.run(&state);
 
@@ -175,7 +175,7 @@ fn test_map_match() {
         Ok(LexerState {
             element: Some('c'),
             position: Some(2),
-            value: Some(100),
+            value: Some(3),
             stream: Rc::new(vec!['a', 'b', 'c']),
         })
     );

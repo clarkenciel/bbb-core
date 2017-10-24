@@ -76,7 +76,7 @@ impl<'a, T: Clone + 'a> From<&'a LexerState<T>> for LexerState<T> {
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct LexerError {
-    pub position: Option<usize>,
+    pub position: usize,
     pub string: String,
 }
 
@@ -86,7 +86,7 @@ where
 {
     fn from(state: LexerState<T>) -> Self {
         LexerError {
-            position: state.position,
+            position: state.position.unwrap_or(0 as usize),
             string: state.stream.iter().collect(),
         }
     }
@@ -98,7 +98,7 @@ where
 {
     fn from(state: &LexerState<T>) -> Self {
         LexerError {
-            position: state.position,
+            position: state.position.unwrap_or(0 as usize),
             string: state.stream.iter().collect(),
         }
     }
@@ -113,6 +113,25 @@ pub type LexerResult<O> = Result<LexerState<O>, LexerError>;
 pub trait Lexer<I: Clone, O: Clone> {
     fn run(&self, state: &LexerState<I>) -> LexerResult<O>;
 }
+
+pub fn lex<'a, O: Clone>(lexer: &'a Lexer<String, O>, state: &'a str) -> Result<O, String> {
+    let initial_state = LexerState::from(state);
+    lexer
+        .run(&initial_state)
+        .map_err(|error| {
+            format!(
+                "Lex failed at position: {}, in string: {}",
+                error.position,
+                error.string
+            )
+        })
+        .and_then(|complete| {
+            complete.value.ok_or(
+                "No value returned from parse".to_owned(),
+            )
+        })
+}
+
 
 // or /////////////////////////////////////////////////////////////////////////
 
@@ -145,7 +164,6 @@ impl<I: Clone, O: Clone, A: Lexer<I, O>, B: Lexer<I, O>> Lexer<I, O> for OrLexer
 pub fn or<I: Clone, O: Clone, A: Lexer<I, O>, B: Lexer<I, O>>(a: A, b: B) -> OrLexer<I, O, A, B> {
     OrLexer::new(a, b)
 }
-
 
 // try ////////////////////////////////////////////////////////////////////////
 
@@ -426,5 +444,28 @@ where
                             )
                     })
             })
+    }
+}
+
+// skip lexer /////////////////////////////////////////////////////////////////
+
+pub struct SkipLexer<I: Clone, O: Clone, L: Lexer<I, O>> {
+    lexer: L,
+    phantom_input: PhantomData<I>,
+    phantom_output: PhantomData<O>,
+}
+
+impl<I, O, L> SkipLexer<I, O, L>
+where
+    I: Clone,
+    O: Clone,
+    L: Lexer<I, O>
+{
+    fn new(lexer: L) -> Self {
+        SkipLexer {
+            lexer: lexer,
+            phantom_input: PhantomData,
+            phantom_output: PhantomData,
+        }
     }
 }
