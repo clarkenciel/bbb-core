@@ -69,7 +69,7 @@ fn test_char_lexer_failure() {
     assert_eq!(
         result,
         Err(LexerError {
-            position: Some(0),
+            position: 0,
             string: "b".to_owned(),
         })
     )
@@ -99,7 +99,7 @@ fn test_string_lexer_failure() {
     assert_eq!(
         result,
         Err(LexerError {
-            position: Some(0),
+            position: 0,
             string: "babc".to_owned(),
         })
     )
@@ -293,6 +293,41 @@ fn test_between_complex_match() {
             position: Some(13),
             value: Some(vec!["abc".to_owned(), "bac".to_owned(), "bac".to_owned(), "abc".to_owned()]),
             stream: Rc::new(vec!['(', 'a', 'b', 'c', 'b', 'a', 'c', 'b', 'a', 'c', 'a', 'b', 'c', ')']),
+        })
+    );
+}
+
+#[test]
+fn test_skip_lexer() {
+    let lexer = skip(string(" "));
+    let state = LexerState::from(" a");
+    let result = lexer.run(&state);
+
+    assert_eq!(
+        result,
+        Ok(LexerState {
+            element: Some(' '),
+            position: Some(0),
+            value: None,
+            stream: Rc::new(vec![' ', 'a'])
+        })
+    );
+}
+
+#[test]
+fn test_skip_lexer_complex() {
+    let lexer = skip(many(or(character('\n'), string(" "))));
+    let state = LexerState::from("
+ a");
+    let result = lexer.run(&state);
+
+    assert_eq!(
+        result,
+        Ok(LexerState {
+            element: Some(' '),
+            position: Some(1),
+            value: None,
+            stream: Rc::new(vec!['\n', ' ', 'a'])
         })
     );
 }

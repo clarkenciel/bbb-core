@@ -459,7 +459,7 @@ impl<I, O, L> SkipLexer<I, O, L>
 where
     I: Clone,
     O: Clone,
-    L: Lexer<I, O>
+    L: Lexer<I, O>,
 {
     fn new(lexer: L) -> Self {
         SkipLexer {
@@ -468,4 +468,24 @@ where
             phantom_output: PhantomData,
         }
     }
+}
+
+impl<I, O, L> Lexer<I, O> for SkipLexer<I, O, L>
+where
+    I: Clone,
+    O: Clone,
+    L: Lexer<I, O>,
+{
+    fn run(&self, state: &LexerState<I>) -> LexerResult<O> {
+        self.lexer.run(state).map(|new_state| new_state.drop_value())
+    }
+}
+
+pub fn skip<I, O, L>(lexer: L) -> SkipLexer<I, O, L>
+where
+    I: Clone,
+    O: Clone,
+    L: Lexer<I, O>,
+{
+    SkipLexer::new(lexer)
 }
