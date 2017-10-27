@@ -26,7 +26,7 @@ named!(float<f32>,
                tuple!(
                    opt!(tag!("-")),
                    digit,
-                   opt!(complete!(preceded!(tag!("."), digit)))
+                   complete!(preceded!(tag!("."), opt!(digit)))
                )
            ),
            |bs| str::from_utf8(bs).map(f32::from_str).unwrap().unwrap()
@@ -45,4 +45,4 @@ named!(int<i32>,
        )
 );
 
-named!(pub number<Numeral>, alt!(map!(int, Numeral::from) | map!(float, Numeral::from)));
+named!(pub number<Numeral>, alt!(map!(float, Numeral::from) | map!(int, Numeral::from)));

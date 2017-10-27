@@ -1,11 +1,14 @@
-use nom::*;
-
-#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum BinOp {
     Sub,
     Add,
     Div,
     Mul,
+    BitShiftR,
+    BitShiftL,
+    BitAnd,
+    BitXOr,
+    BitOr,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -20,7 +23,12 @@ named!(pub binop<BinOp>,
         value!(BinOp::Sub, tag!("-")) |
         value!(BinOp::Add, tag!("+")) |
         value!(BinOp::Div, tag!("/")) |
-        value!(BinOp::Mul, tag!("*"))
+        value!(BinOp::Mul, tag!("*")) |
+        value!(BinOp::BitShiftR, tag!(">>")) |
+        value!(BinOp::BitShiftL, tag!("<<")) |
+        value!(BinOp::BitAnd, tag!("&")) |
+        value!(BinOp::BitOr, tag!("|")) |
+        value!(BinOp::BitXOr, tag!("^"))
     )
 );
 
