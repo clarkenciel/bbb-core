@@ -1,5 +1,5 @@
 [package]
-name = "bbb"
+name = "bbb-core"
 version = "0.1.0"
 authors = ["Danny Clarke <danny.clarke@gimbal.com>"]
 
