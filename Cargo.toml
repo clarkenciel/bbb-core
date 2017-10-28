@@ -9,3 +9,4 @@ hound = "3.2.0"
 
 [dependencies.nom]
 version = "^3.2"
+features = ["verbose-errors"]

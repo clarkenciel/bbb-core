@@ -21,28 +21,33 @@ impl From<f32> for Numeral {
 }
 
 named!(float<f32>,
-       map!(
-           recognize!(
-               tuple!(
-                   opt!(tag!("-")),
-                   digit,
-                   complete!(preceded!(tag!("."), opt!(digit)))
-               )
+       map_res!(
+           map_res!(
+               recognize!(
+                   tuple!(
+                       opt!(tag!("-")),
+                       digit,
+                       complete!(preceded!(tag!("."), opt!(digit)))
+                   )
+               ),
+               str::from_utf8
            ),
-           |bs| str::from_utf8(bs).map(f32::from_str).unwrap().unwrap()
+           f32::from_str
        )
 );
 
 named!(int<i32>,
-       map!(
-           recognize!(
-               tuple!(
-                   opt!(tag!("-")),
-                   digit
-               )
+       map_res!(
+           map_res!(
+               recognize!(
+                   tuple!(opt!(tag!("-")), digit)
+               ),
+               str::from_utf8
            ),
-           |bs| str::from_utf8(bs).map(|s| i32::from_str_radix(s, 10)).unwrap().unwrap()
+           |s| i32::from_str_radix(s, 10)
        )
 );
 
-named!(pub number<Numeral>, alt!(map!(float, Numeral::from) | map!(int, Numeral::from)));
+named!(pub number<Numeral>,
+       alt!(map!(float, Numeral::from) | map!(int, Numeral::from))
+);
