@@ -1,8 +1,10 @@
 #[macro_use]
 extern crate nom;
+extern crate sample;
 
-pub mod numeral;
-pub mod ops;
-pub mod expr;
+mod numeral;
+mod ops;
+mod expr;
+mod eval;
+pub mod signal;
 pub mod parser;
-pub mod eval;
