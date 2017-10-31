@@ -3,19 +3,26 @@ use numeral::*;
 use ops::*;
 use self::Expr::*;
 
-struct Exp(Box<Term>, Box<Exp1>);
-enum Exp1 {
+#[derive(Debug, PartialEq)]
+pub struct Exp(Box<Term>, Box<Exp1>);
+
+#[derive(Debug, PartialEq)]
+pub enum Exp1 {
     Empty,
     Seq(BinOp, Box<Exp>),
 }
 
-struct Term(Box<Factor>, Box<Term1>);
-enum Term1 {
+#[derive(Debug, PartialEq)]
+pub struct Term(pub Box<Factor>, pub Box<Term1>);
+
+#[derive(Debug, PartialEq)]
+pub enum Term1 {
     Empty,
     Seq(BinOp, Box<Term>),
 }
 
-enum Factor {
+#[derive(Debug, PartialEq)]
+pub enum Factor {
     Expr(Box<Expr>),
     Exp(Box<Exp>),
     Unary(UnOp, Box<Factor>),
@@ -70,24 +77,30 @@ fn extract_factor(factor: &Factor) -> Box<Expr> {
     }
 }
 
-named!(time<Expr>, value!(Time, char!('t')));
+named!(time<Expr>, value!(Time, alt!(char!('T') | char!('t'))));
 named!(num<Expr>, map!(number, Num));
 
-named!(exp<Exp>,
-       complete!(map!(tuple!(term, exp1), |(t, e)| Exp(Box::new(t), Box::new(e)))));
-named!(exp1<Exp1>, alt!(
-    map!(tuple!(add_or_sub, exp), |(o, e)| Exp1::Seq(o, Box::new(e))) |
-    value!(Exp1::Empty, eof!())
+named!(exp<Exp>, complete!(ws!(
+    map!(pair!(term, exp1), |(t, e)| Exp(Box::new(t), Box::new(e)))
+)));
+
+named!(exp1<Exp1>, ws!(alt!(
+    map!(pair!(add_or_sub, exp), |(o, e)| Exp1::Seq(o, Box::new(e))) |
+    value!(Exp1::Empty, empty)
+)));
+
+named!(pub term<Term>, ws!(
+    map!(pair!(factor, term1), |(f, t)| Term(Box::new(f), Box::new(t)))
 ));
 
-named!(term<Term>, map!(tuple!(factor, term1), |(f, t)| Term(Box::new(f), Box::new(t))));
+named!(empty<&[u8]>, tag!(""));
 
-named!(term1<Term1>, alt!(
-    map!(tuple!(mul_or_div, term), |(o, t)| Term1::Seq(o, Box::new(t))) |
-    value!(Term1::Empty, eof!())
-));
+named!(term1<Term1>, ws!(alt!(
+    map!(pair!(mul_or_div, term), |(o, t)| Term1::Seq(o, Box::new(t))) |
+    value!(Term1::Empty, empty)
+)));
 
-named!(factor<Factor>,
+named!(pub factor<Factor>, ws!(
        alt!(
            map!(
                alt!(time | num),
@@ -98,8 +111,8 @@ named!(factor<Factor>,
                |e| Factor::Exp(Box::new(e))
            ) |
            map!(
-               tuple!(unop, factor),
+               pair!(unop, factor),
                |(o, f)| Factor::Unary(o, Box::new(f))
            )
        )
-);
+));

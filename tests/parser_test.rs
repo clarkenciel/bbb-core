@@ -1,17 +1,20 @@
 extern crate bbb_core;
+extern crate nom;
 
 use bbb_core::parser::*;
 use bbb_core::expr::Expr::*;
 use bbb_core::numeral::Numeral::*;
 use bbb_core::ops::BinOp::*;
 use bbb_core::ops::UnOp::*;
-
+use nom::*;
+use nom::IResult::*;
 
 #[test]
 fn time_parse() {
     let exp1 = "t";
     let exp2 = " t";
     let exp3 = "t ";
+
     assert_eq!(parse(exp1), Ok(Box::new(Time)));
     assert_eq!(parse(exp2), Ok(Box::new(Time)));
     assert_eq!(parse(exp3), Ok(Box::new(Time)));
