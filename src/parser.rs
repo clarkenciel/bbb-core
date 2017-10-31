@@ -1,136 +1,105 @@
 use expr::Expr;
-use nom::IResult::*;
 use numeral::*;
 use ops::*;
 use self::Expr::*;
 
-named!(time<Expr>, value!(Time, alt!(tag!("t") | tag!("T"))));
-named!(expr_num<Expr>, map!(number, Num));
-named!(parens<Expr>, ws!(delimited!(tag!("("), expr, tag!(")"))));
-
-named!(factor<Expr>,
-       ws!(
-           alt!(
-               alt!(time | expr_num) |
-               parens
-           )
-       )
-);
-
-named!(binexp1<Expr>,
-       do_parse!(
-           term1: factor >>
-           res: pair!(ws!(mul_or_div), factor) >>
-           (BinExpr(Box::new(term1), res.0, Box::new(res.1)))
-       )
-);
-
-named!(binexp2<Expr>,
-       do_parse!(
-           term1: factor >>
-           res: pair!(ws!(add_or_sub), factor) >>
-           (BinExpr(Box::new(term1), res.0, Box::new(res.1)))
-       )
-);
-
-named!(binexp3<Expr>,
-       do_parse!(
-           term1: factor >>
-           res: pair!(ws!(bit_shift), factor) >>
-           (BinExpr(Box::new(term1), res.0, Box::new(res.1)))
-       )
-);
-
-named!(binexp4<Expr>,
-       do_parse!(
-           term1: factor >>
-           res: pair!(ws!(bit_and), factor) >>
-           (BinExpr(Box::new(term1), res.0, Box::new(res.1)))
-       )
-);
-
-named!(binexp5<Expr>,
-       do_parse!(
-           term1: factor >>
-           res: pair!(ws!(bit_xor), factor) >>
-           (BinExpr(Box::new(term1), res.0, Box::new(res.1)))
-       )
-);
-
-named!(binexp6<Expr>,
-       do_parse!(
-           term1: factor >>
-           res: pair!(ws!(bit_or), factor) >>
-           (BinExpr(Box::new(term1), res.0, Box::new(res.1)))
-       )
-);
-
-named!(bin_expr<Expr>,
-       alt!(binexp1 | binexp2 | binexp3 | binexp4 | binexp5 | binexp6)
-);
-
-named!(un_expr<Expr>,
-       map!(
-           tuple!(unop, expr),
-           |(op, expr)| UnExpr(op, Box::new(expr))
-       )
-);
-
-named!(pub expr<Expr>,
-       ws!(alt_complete!(ws!(bin_expr) | ws!(un_expr) | ws!(factor)))
-);
-
-named!(remainder<(BinOp, Expr)>,
-       complete!(
-           pair!(
-               ws!(
-                   alt!(
-                       mul_or_div |
-                       add_or_sub |
-                       bit_shift |
-                       bit_and |
-                       bit_xor |
-                       bit_or
-                   )
-               ),
-               factor
-           )
-       )
-);
-
-pub fn parse(input: &[u8]) -> Result<Box<Expr>, String> {
-    match expr(input) {
-        Incomplete(_) => return Err("Incomplete Parse".to_owned()),
-        Error(err) => return Err(format!("{}", err)),
-        Done(remaining, tree) => {
-            if remaining == &b""[..] {
-                Ok(Box::new(tree))
-            } else {
-                parse_remaining(Box::new(tree), remaining)
-            }
-        }
-    }
+struct Exp(Box<Term>, Box<Exp1>);
+enum Exp1 {
+    Empty,
+    Seq(BinOp, Box<Exp>),
 }
 
-fn parse_remaining(left_tree: Box<Expr>, remaining: &[u8]) -> Result<Box<Expr>, String> {
-    let mut running = remaining;
-    let mut left = left_tree;
+struct Term(Box<Factor>, Box<Term1>);
+enum Term1 {
+    Empty,
+    Seq(BinOp, Box<Term>),
+}
 
-    loop {
-        match remainder(running) {
-            Incomplete(_) => return Err("Incomplete Parse".to_owned()),
-            Error(err) => return Err(format!("{}", err)),
-            Done(bytes, (op, right_tree)) => {
-                if bytes == &b""[..] {
-                    left = Box::new(BinExpr(left, op, Box::new(right_tree)));
-                    break;
-                } else {
-                    running = bytes;
-                    left = Box::new(BinExpr(left, op, Box::new(right_tree)));
+enum Factor {
+    Expr(Box<Expr>),
+    Exp(Box<Exp>),
+    Unary(UnOp, Box<Factor>),
+}
+
+pub fn parse(input: &str) -> Result<Box<Expr>, String> {
+    exp(input.as_bytes())
+        .to_result()
+        .map(|result| extract_expression(&result))
+        .map_err(|e| format!("{}", e))
+}
+
+fn extract_expression(exp: &Exp) -> Box<Expr> {
+    match exp {
+        &Exp(ref term, ref expr) => {
+            match expr.as_ref() {
+                &Exp1::Empty => extract_term(term.as_ref()),
+                &Exp1::Seq(ref op, ref exp) => {
+                    Box::new(BinExpr(
+                        extract_term(term.as_ref()),
+                        op.clone(),
+                        extract_expression(exp.as_ref()),
+                    ))
                 }
             }
         }
     }
-
-    Ok(left)
 }
+
+fn extract_term(term: &Term) -> Box<Expr> {
+    match term {
+        &Term(ref factor, ref term1) => {
+            match term1.as_ref() {
+                &Term1::Empty => extract_factor(factor.as_ref()),
+                &Term1::Seq(ref op, ref term2) => {
+                    Box::new(BinExpr(
+                        extract_factor(factor.as_ref()),
+                        op.clone(),
+                        extract_term(term2.as_ref()),
+                    ))
+                }
+            }
+        }
+    }
+}
+
+fn extract_factor(factor: &Factor) -> Box<Expr> {
+    match factor {
+        &Factor::Expr(ref e) => e.clone(),
+        &Factor::Exp(ref e) => extract_expression(e.as_ref()),
+        &Factor::Unary(ref op, ref f) => Box::new(UnExpr(op.clone(), extract_factor(f.as_ref()))),
+    }
+}
+
+named!(time<Expr>, value!(Time, char!('t')));
+named!(num<Expr>, map!(number, Num));
+
+named!(exp<Exp>,
+       complete!(map!(tuple!(term, exp1), |(t, e)| Exp(Box::new(t), Box::new(e)))));
+named!(exp1<Exp1>, alt!(
+    map!(tuple!(add_or_sub, exp), |(o, e)| Exp1::Seq(o, Box::new(e))) |
+    value!(Exp1::Empty, eof!())
+));
+
+named!(term<Term>, map!(tuple!(factor, term1), |(f, t)| Term(Box::new(f), Box::new(t))));
+
+named!(term1<Term1>, alt!(
+    map!(tuple!(mul_or_div, term), |(o, t)| Term1::Seq(o, Box::new(t))) |
+    value!(Term1::Empty, eof!())
+));
+
+named!(factor<Factor>,
+       alt!(
+           map!(
+               alt!(time | num),
+               |l| Factor::Expr(Box::new(l))
+           ) |
+           map!(
+               delimited!(char!('('), exp, char!(')')),
+               |e| Factor::Exp(Box::new(e))
+           ) |
+           map!(
+               tuple!(unop, factor),
+               |(o, f)| Factor::Unary(o, Box::new(f))
+           )
+       )
+);

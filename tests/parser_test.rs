@@ -1,137 +1,120 @@
-extern crate nom;
-extern crate bbb;
+extern crate bbb_core;
 
-use bbb::expr::*;
-use Expr::*;
-use nom::IResult::*;
-use bbb::numeral::Numeral::*;
-use bbb::ops::BinOp::*;
-use bbb::ops::UnOp::*;
+use bbb_core::parser::*;
+use bbb_core::expr::Expr::*;
+use bbb_core::numeral::Numeral::*;
+use bbb_core::ops::BinOp::*;
+use bbb_core::ops::UnOp::*;
 
 
 #[test]
-fn time_expr() {
-    let exp1 = "t".as_bytes();
-    let exp2 = " t".as_bytes();
-    let exp3 = "t ".as_bytes();
-    assert_eq!(expr(exp1), Done(&b""[..], Time));
-    assert_eq!(expr(exp2), Done(&b""[..], Time));
-    assert_eq!(expr(exp3), Done(&b""[..], Time));
+fn time_parse() {
+    let exp1 = "t";
+    let exp2 = " t";
+    let exp3 = "t ";
+    assert_eq!(parse(exp1), Ok(Box::new(Time)));
+    assert_eq!(parse(exp2), Ok(Box::new(Time)));
+    assert_eq!(parse(exp3), Ok(Box::new(Time)));
 
-    let exp1 = "T".as_bytes();
-    let exp2 = " T".as_bytes();
-    let exp3 = "T ".as_bytes();
-    assert_eq!(expr(exp1), Done(&b""[..], Time));
-    assert_eq!(expr(exp2), Done(&b""[..], Time));
-    assert_eq!(expr(exp3), Done(&b""[..], Time));
+    let exp1 = "T";
+    let exp2 = " T";
+    let exp3 = "T ";
+    assert_eq!(parse(exp1), Ok(Box::new(Time)));
+    assert_eq!(parse(exp2), Ok(Box::new(Time)));
+    assert_eq!(parse(exp3), Ok(Box::new(Time)));
 }
 
 #[test]
-fn number_expr() {
-    let exp1 = "10".as_bytes();
-    assert_eq!(expr(exp1), Done(&b""[..], Num(Int(10))));
+fn number_parse() {
+    let exp1 = "10";
+    assert_eq!(parse(exp1), Ok(Box::new(Num(Int(10)))));
 
-    let exp2 = "10.1".as_bytes();
-    assert_eq!(expr(exp2), Done(&b""[..], Num(Float(10.1))));
+    let exp2 = "10.1";
+    assert_eq!(parse(exp2), Ok(Box::new(Num(Float(10.1)))));
 
-    let exp3 = "-10".as_bytes();
-    assert_eq!(expr(exp3), Done(&b""[..], Num(Int(-10))));
+    let exp3 = "-10";
+    assert_eq!(parse(exp3), Ok(Box::new(Num(Int(-10)))));
 
-    let exp4 = "-10.1".as_bytes();
-    assert_eq!(expr(exp4), Done(&b""[..], Num(Float(-10.1))));
+    let exp4 = "-10.1";
+    assert_eq!(parse(exp4), Ok(Box::new(Num(Float(-10.1)))));
 
-    let exp5 = "0.1".as_bytes();
-    assert_eq!(expr(exp5), Done(&b""[..], Num(Float(0.1))));
+    let exp5 = "0.1";
+    assert_eq!(parse(exp5), Ok(Box::new(Num(Float(0.1)))));
 
-    let exp6 = "-0.1".as_bytes();
-    assert_eq!(expr(exp6), Done(&b""[..], Num(Float(-0.1))));
+    let exp6 = "-0.1";
+    assert_eq!(parse(exp6), Ok(Box::new(Num(Float(-0.1)))));
 }
 
 #[test]
-fn binop_expr() {
-    let exp1 = "1 + -1".as_bytes();
+fn binop_parse() {
+    let exp1 = "1 + -1";
     assert_eq!(
-        expr(exp1),
-        Done(&b""[..],
-             BinExpr(
-                 Box::new(Num(Int(1))),
-                 Add,
-                 Box::new(Num(Int(-1)))
-             )
-        )
+        parse(exp1),
+        Ok(Box::new(
+            BinExpr(Box::new(Num(Int(1))), Add, Box::new(Num(Int(-1)))),
+        ))
     );
 
-    let exp2 = "(1 + 1)".as_bytes();
+    let exp2 = "(1 + 1)";
     assert_eq!(
-        expr(exp2),
-        Done(&b""[..],
-             BinExpr(
-                 Box::new(Num(Int(1))),
-                 Add,
-                 Box::new(Num(Int(1)))
-             )
-        )
+        parse(exp2),
+        Ok(Box::new(
+            BinExpr(Box::new(Num(Int(1))), Add, Box::new(Num(Int(1)))),
+        ))
     );
 
-    let exp3 = "(t) + -10".as_bytes();
+    let exp3 = "(t) + -10";
     assert_eq!(
-        expr(exp3),
-        Done(&b""[..],
-             BinExpr(
-                 Box::new(Time),
-                 Add,
-                 Box::new(Num(Int(-10)))
-             )
-        )
+        parse(exp3),
+        Ok(Box::new(
+            BinExpr(Box::new(Time), Add, Box::new(Num(Int(-10)))),
+        ))
+    );
+
+    let exp4 = "1 + 1 - 1";
+    assert_eq!(
+        parse(exp4),
+        Ok(Box::new(BinExpr(
+            Box::new(
+                BinExpr(Box::new(Num(Int(1))), Add, Box::new(Num(Int(1)))),
+            ),
+            Sub,
+            Box::new(Num(Int(1))),
+        )))
     );
 }
 
 #[test]
-fn unop_expr() {
-    let exp1 = "~10".as_bytes();
+fn unop_parse() {
+    let exp1 = "~10";
     assert_eq!(
-        expr(exp1),
-        Done(&b""[..], UnExpr(BitNot, Box::new(Num(Int(10)))))
+        parse(exp1),
+        Ok(Box::new(UnExpr(BitNot, Box::new(Num(Int(10))))))
     );
 
-    let exp2 = "-(10 * t)".as_bytes();
+    let exp2 = "-(10 * t)";
     assert_eq!(
-        expr(exp2),
-        Done(
-            &b""[..],
-            UnExpr(
-                Neg,
-                Box::new(
-                    BinExpr(
-                        Box::new(Num(Int(10))),
-                        Mul,
-                        Box::new(Time)
-                    )
-                )
-            )
-        )
+        parse(exp2),
+        Ok(Box::new(UnExpr(
+            BitNot,
+            Box::new(
+                BinExpr(Box::new(Num(Int(10))), Mul, Box::new(Time)),
+            ),
+        )))
     );
 }
 
 #[test]
 fn expr_precedence() {
-    let exp1 = "1 + -2 * 3".as_bytes();
+    let exp1 = "1 + -2 * 3";
     assert_eq!(
         parse(exp1),
-        Ok(
+        Ok(Box::new(BinExpr(
             Box::new(
-                BinExpr(
-                    Box::new(
-                        BinExpr(
-                            Box::new(Num(Int(1))),
-                            Add,
-                            Box::new(Num(Int(-2)))
-                        ),
-                    ),
-                    Mul,
-                    Box::new(Num(Int(3)))
-                )
-            )
-        )
+                BinExpr(Box::new(Num(Int(1))), Add, Box::new(Num(Int(-2)))),
+            ),
+            Mul,
+            Box::new(Num(Int(3))),
+        )))
     );
 }

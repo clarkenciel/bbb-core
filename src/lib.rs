@@ -2,9 +2,9 @@
 extern crate nom;
 extern crate sample;
 
-mod numeral;
-mod ops;
-mod expr;
-mod eval;
+pub mod numeral;
+pub mod ops;
+pub mod expr;
+pub mod eval;
 pub mod signal;
 pub mod parser;

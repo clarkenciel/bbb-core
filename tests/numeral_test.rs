@@ -1,6 +1,6 @@
-extern crate bbb;
+extern crate bbb_core;
 
-use bbb::numeral::*;
+use bbb_core::numeral::*;
 
 #[test]
 fn single_digit_int() {

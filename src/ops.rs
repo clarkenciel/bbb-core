@@ -87,8 +87,8 @@ named!(neg_op<UnOp>,
        value!(UnOp::Neg,
               recognize!(
                   tuple!(
-                      tag!("-"),
-                      peek!(tag!("("))
+                      char!('-'),
+                      peek!(char!('('))
                   )
               )
        )
@@ -97,7 +97,7 @@ named!(neg_op<UnOp>,
 named!(pub unop<UnOp>,
        alt!(
            neg_op |
-           value!(UnOp::BoolNot, tag!("!")) |
-           value!(UnOp::BitNot, tag!("~"))
+           value!(UnOp::BoolNot, char!('!')) |
+           value!(UnOp::BitNot, char!('~'))
        )
 );

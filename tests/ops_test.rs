@@ -1,7 +1,7 @@
 extern crate nom;
-extern crate bbb;
+extern crate bbb_core;
 
-use bbb::ops::*;
+use bbb_core::ops::*;
 use nom::Needed::Size;
 use nom::IResult::*;
 
