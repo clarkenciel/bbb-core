@@ -1,3 +1,4 @@
+
 use numeral::*;
 use ops::*;
 use expr::Expr;
@@ -28,54 +29,53 @@ pub enum Factor {
     Unary(UnOp, Box<Factor>),
 }
 
-// pub fn parse(input: &str) -> Result<Box<Expr>, String> {
-//     exp(input.as_bytes())
-//         .to_result()
-//         .map(|result| extract_expression(&result))
-//         .map_err(|e| format!("{}", e))
-// }
+impl From<Factor> for Expr {
+    fn from(f: Factor) -> Self {
+        match f {
+            Factor::Expr(expr) => *expr,
+            Factor::Exp(exp) => Expr::from(*exp),
+            Factor::Unary(op, sub_f) => {
+                UnExpr(
+                    op,
+                    Box::new(Expr::from(*sub_f)),
+                )
+            }
+        }
+    }
+}
 
-// fn extract_expression(exp: &Exp) -> Box<Expr> {
-//     match exp {
-//         &Exp(ref term, ref expr) => {
-//             match expr.as_ref() {
-//                 &Exp1::Empty => extract_term(term.as_ref()),
-//                 &Exp1::Seq(ref op, ref exp) => {
-//                     Box::new(BinExpr(
-//                         extract_term(term.as_ref()),
-//                         op.clone(),
-//                         extract_expression(exp.as_ref()),
-//                     ))
-//                 }
-//             }
-//         }
-//     }
-// }
+impl From<Term> for Expr {
+    fn from(t: Term) -> Self {
+        match *t.1 {
+            Term1::Empty => Expr::from(*t.0),
+            Term1::Seq(op, t2) => BinExpr(
+                Box::new(Expr::from(*t.0)),
+                BinOp::One(op),
+                Box::new(Expr::from(*t2))
+            )
+        }
+    }
+}
 
-// fn extract_term(term: &Term) -> Box<Expr> {
-//     match term {
-//         &Term(ref factor, ref term1) => {
-//             match term1.as_ref() {
-//                 &Term1::Empty => extract_factor(factor.as_ref()),
-//                 &Term1::Seq(ref op, ref term2) => {
-//                     Box::new(BinExpr(
-//                         extract_factor(factor.as_ref()),
-//                         op.clone(),
-//                         extract_term(term2.as_ref()),
-//                     ))
-//                 }
-//             }
-//         }
-//     }
-// }
+impl From<Exp> for Expr {
+    fn from(e: Exp) -> Self {
+        match *e.1 {
+            Exp1::Empty => Expr::from(*e.0),
+            Exp1::Seq(op, e2) => BinExpr(
+                Box::new(Expr::from(*e.0)),
+                BinOp::Two(op),
+                Box::new(Expr::from(*e2))
+            ),
+        }
+    }
+}
 
-// fn extract_factor(factor: &Factor) -> Box<Expr> {
-//     match factor {
-//         &Factor::Expr(ref e) => e.clone(),
-//         &Factor::Exp(ref e) => extract_expression(e.as_ref()),
-//         &Factor::Unary(ref op, ref f) => Box::new(UnExpr(op.clone(), extract_factor(f.as_ref()))),
-//     }
-// }
+pub fn parse(input: &str) -> Result<Expr, String> {
+    exp(input.as_bytes())
+        .to_result()
+        .map(Expr::from)
+        .map_err(|e| format!("{}", e))
+}
 
 named!(time<Expr>, value!(Time, alt!(char!('T') | char!('t'))));
 named!(num<Expr>, map!(number, Num));
