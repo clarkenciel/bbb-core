@@ -5,7 +5,7 @@ use expr::Expr;
 use self::Expr::*;
 
 pub fn parse(input: &str) -> Result<Expr, String> {
-    exp(input.as_bytes()).to_result().map(Expr::from).map_err(
+    bit_or_exp(input.as_bytes()).to_result().map(Expr::from).map_err(
         |e| {
             format!("{}", e)
         },
@@ -69,7 +69,7 @@ enum Term1 {
 #[derive(Debug, PartialEq)]
 enum Factor {
     Expr(Box<Expr>),
-    Exp(Box<Exp>),
+    Exp(Box<BitOrExp>),
     Unary(UnOp, Box<Factor>),
 }
 
@@ -245,7 +245,7 @@ named!(factor<Factor>, ws!(
             |l| Factor::Expr(Box::new(l))
         ) |
         map!(
-            delimited!(char!('('), exp, char!(')')),
+            delimited!(char!('('), bit_or_exp, char!(')')),
             |e| Factor::Exp(Box::new(e))
         ) |
         map!(

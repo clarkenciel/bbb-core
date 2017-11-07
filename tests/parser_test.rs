@@ -149,3 +149,70 @@ fn simple_binary_parse_test() {
         )
     );
 }
+
+#[test]
+fn complex_binary_parse_test() {
+    let e = "1 * 1 + 1 >> 1 & 1 ^ 1 | 1";
+    assert_eq!(
+        parse(e),
+        Ok(
+            BinExpr(
+                Box::new(BinExpr(
+                    Box::new(BinExpr(
+                        Box::new(BinExpr(
+                            Box::new(BinExpr(
+                                Box::new(BinExpr(
+                                    Box::new(Num(Int(1))),
+                                    BinOp::One(BinOp1::Mul),
+                                    Box::new(Num(Int(1)))
+                                )),
+                                BinOp::Two(BinOp2::Add),
+                                Box::new(Num(Int(1)))
+                            )),
+                            BinOp::Three(BitShift::Right),
+                            Box::new(Num(Int(1)))
+                        )),
+                        BinOp::Four(BitAnd),
+                        Box::new(Num(Int(1)))
+                    )),
+                    BinOp::Five(BitXOr),
+                    Box::new(Num(Int(1)))
+                )),
+                BinOp::Six(BitOr),
+                Box::new(Num(Int(1)))
+            )
+        )
+    );
+
+    let e = "1 * 1 + 1 >> 1 & 1 ^ (t | 1)";
+    assert_eq!(
+        parse(e),
+        Ok(
+            BinExpr(
+                Box::new(BinExpr(
+                    Box::new(BinExpr(
+                        Box::new(BinExpr(
+                            Box::new(BinExpr(
+                                Box::new(Num(Int(1))),
+                                BinOp::One(BinOp1::Mul),
+                                Box::new(Num(Int(1)))
+                            )),
+                            BinOp::Two(BinOp2::Add),
+                            Box::new(Num(Int(1)))
+                        )),
+                        BinOp::Three(BitShift::Right),
+                        Box::new(Num(Int(1)))
+                    )),
+                    BinOp::Four(BitAnd),
+                    Box::new(Num(Int(1)))
+                )),
+                BinOp::Five(BitXOr),
+                Box::new(BinExpr(
+                    Box::new(Time),
+                    BinOp::Six(BitOr),
+                    Box::new(Num(Int(1)))
+                ))
+            )
+        )
+    );
+}
