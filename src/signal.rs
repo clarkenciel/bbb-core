@@ -17,12 +17,12 @@ impl From<Expr> for ExprSignal {
 }
 
 impl Signal for ExprSignal {
-    type Frame = [i32; 1];
+    type Frame = [i8; 1];
 
     fn next(&mut self) -> Self::Frame {
         if let Ok(x) = eval(self.time, &self.expression) {
             self.time +=1;
-            [x]
+            [x as i8]
         } else {
             self.time += 1;
             [0]
