@@ -3,8 +3,7 @@ extern crate hound;
 extern crate nom;
 extern crate sample;
 
-const SAMPLE_RATE: u32 = 44_100;
-const TIME_STEP: u32 = 8_000;
+const SAMPLE_RATE: u32 = 8_000;
 
 pub mod expr;
 pub mod eval;
