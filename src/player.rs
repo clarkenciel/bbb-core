@@ -14,13 +14,7 @@ impl Player {
     pub fn new(sample_rate: f64, buffer_size: u32) -> Result<Self, String> {
         pa::PortAudio::new()
             .and_then(|audio| {
-                let result = audio.default_output_device().and_then(|device| {
-                    audio.device_info(device).and_then(|info| {
-                        let latency = info.default_low_output_latency;
-                        let params = pa::StreamParameters::new(device, 1, false, latency);
-                        Ok(pa::OutputStreamSettings::new(params, sample_rate, buffer_size))
-                    })
-                });
+                let result = audio.default_output_stream_settings(1, sample_rate, buffer_size);
 
                 match result {
                     Ok(settings) => Ok(Player {
@@ -43,13 +37,11 @@ impl Player {
         let callback = move |pa::OutputStreamCallbackArgs { buffer, .. }| {
             stream
                 .lock()
-                .map(|mut stream| {
-                    for output_sample in buffer.iter_mut() {
-                        let val = stream.next()[0];
-                        *output_sample = val;
-                    }
+                .map(|mut stream| for output_sample in buffer.iter_mut() {
+                    *output_sample = stream.next()[0];
                 })
                 .ok();
+
             pa::Continue
         };
 
@@ -69,11 +61,11 @@ impl Player {
         if let Some(ref mut stream) = self.stream {
             output = stream.stop();
         } else {
-            return Ok(())
+            return Ok(());
         }
 
-        output
-            .map(|_| self.stream = None)
-            .map_err(|e| format!("Could not stop audio stream: {}", e))
+        output.map(|_| self.stream = None).map_err(|e| {
+            format!("Could not stop audio stream: {}", e)
+        })
     }
 }

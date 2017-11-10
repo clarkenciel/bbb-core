@@ -23,14 +23,13 @@ impl Recorder {
     pub fn record<'a>(
         &self,
         filename: &'a str,
-        duration: u32,
+        duration: f32,
         signal: &'a mut ExprSignal,
     ) -> Result<(), String> {
         WavWriter::create(filename, self.spec)
             .and_then(|mut writer| {
-                for _ in 0..self.spec.sample_rate * duration {
-                    let samp = signal.next()[0];
-                    match writer.write_sample(samp) {
+                for _ in 0..(self.spec.sample_rate as f32 * duration) as u32 {
+                    match writer.write_sample(signal.next()[0]) {
                         Ok(_) => continue,
                         err => return err
                     }

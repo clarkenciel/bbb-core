@@ -2,6 +2,7 @@ use eval::eval;
 use expr::Expr;
 use sample::signal::Signal;
 
+#[derive(Clone)]
 pub struct ExprSignal {
     pub time: i32,
     expression: Expr,
