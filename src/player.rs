@@ -44,7 +44,6 @@ impl Player {
             stream
                 .lock()
                 .map(|mut stream| {
-                    println!("stream time: {}", stream.time);
                     for output_sample in buffer.iter_mut() {
                         let val = stream.next()[0];
                         *output_sample = val;
