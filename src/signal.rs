@@ -3,7 +3,7 @@ use expr::Expr;
 use sample::signal::Signal;
 
 pub struct ExprSignal {
-    time: i32,
+    pub time: i32,
     expression: Expr,
 }
 
