@@ -1,3 +1,6 @@
+use std::fmt;
+use std::fmt::{Display};
+use std::panic;
 use std::sync::{Arc, Mutex};
 use pa;
 
@@ -10,27 +13,43 @@ pub struct Player {
     stream: Option<pa::Stream<pa::NonBlocking, pa::Output<i8>>>,
 }
 
+#[derive(Copy, Clone, Debug)]
+enum Error {
+    Initialization(pa::Error),
+    NoDeviceFound
+}
+
+impl Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            Error::Initialization(cause) =>
+                write!(f, "Failed to initialize PortAudio: {}", cause),
+            Error::NoDeviceFound =>
+                write!(f, "No audio device could be found"),
+        }
+    }
+}
+
 impl Player {
     pub fn new(sample_rate: f64, buffer_size: u32) -> Result<Self, String> {
         pa::PortAudio::new()
+            .map_err(Error::Initialization)
             .and_then(|audio| {
-                let result = audio.default_output_stream_settings(1, sample_rate, buffer_size);
-
-                match result {
-                    Ok(settings) => Ok(Player {
-                        pa: audio,
-                        stream_settings: settings,
-                        stream: None,
-                    }),
-                    Err(e) => Err(e),
-                }
+                panic::catch_unwind(|| {
+                    audio.default_output_stream_settings(1, sample_rate, buffer_size)
+                })
+                .map_err(|_| Error::NoDeviceFound)
+                .and_then(|result| {
+                    result
+                        .map(|settings| Player {
+                            pa: audio,
+                            stream_settings: settings,
+                            stream: None,
+                        })
+                        .map_err(Error::Initialization)
+                })
             })
-            .map_err(|e| {
-                format!(
-                    "Could not create new Player due to an error in PortAudio: {}",
-                    e
-                )
-            })
+            .map_err(|e| format!("{}", e))
     }
 
     pub fn play(&mut self, stream: Arc<Mutex<ExprSignal>>) -> Result<(), String> {
