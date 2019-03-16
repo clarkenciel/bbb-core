@@ -1,6 +1,6 @@
-[root]
+[[package]]
 name = "bbb_core"
-version = "0.1.0"
+version = "1.0.1"
 dependencies = [
  "hound 3.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "nom 3.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
